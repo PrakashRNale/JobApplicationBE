@@ -3,29 +3,56 @@ const ejs = require('ejs');
 const path = require('path');
 const getS3File = require("../utils/s3");
 const { getDelay } = require("../utils/helper");
+const sequelize = require("../utils/db");
+const Company = require("../models/company");
+
+sequelize.sync({ force: true }) // Set `force: true` to drop tables and recreate them
+.then(() => {
+  console.log('Database & tables created!');
+})
+.catch((error) => {
+  console.error('Error syncing database:', error);
+});
 
 exports.applyJob = async(req, res, next) =>{
     // Path to the EJS template
+
     const templatePath = path.join(__dirname, '..', 'views', 'email-templates', `job-application.ejs`);
     const fileName = 'Prakash Nale_New.pdf'
     // console.log('Template Path is '+templatePath)
     const fileContent = await getS3File(process.env.AWS_BUCKET_NAME, fileName)
 
+    const { companyName,  hrEmail, subject, hrName, targetDateTime  } = req.body;
+
     // Render the template with provided data
     console.log('************************ RECEIVED FILE *******************************')
-    const html = await ejs.renderFile(templatePath, {name : req.body.toName});
-    // console.log('Mail Content is  '+html)
-
-    const targetDateTime = req.body.dateTime;  // The target date and tim
-   
+    const html = await ejs.renderFile(templatePath, {name : hrName});
+    
     const delay = getDelay(targetDateTime);
 
     if (delay > 0) {
         console.log(`Scheduling task to execute in ${delay} milliseconds (UTC time)`);
 
+        Company.create({
+            name : companyName,
+            hrname : hrName,
+            hremail : hrEmail,
+            maildroptime : targetDateTime,
+            subject : subject,
+            isapplied : false
+          }).then((company) => {
+            console.log('User created:', company.toJSON());
+
+            // Remove follwing code later
+            Company.findAll().then((users) => {
+                console.log('All users:', users);
+              });
+    
+          });
+
         const mailOptions = {
-            to: req.body.toEmail,
-            subject: req.body.subject,
+            to: hrEmail,
+            subject: subject,
             html: html,
             attachments: [
                 {
@@ -36,9 +63,22 @@ exports.applyJob = async(req, res, next) =>{
         };
 
         // Schedule the task
-        setTimeout(() => {
+        setTimeout(async () => {
             console.log('Executing scheduled task at:', new Date().toISOString());
-            sendMail(mailOptions);
+            const [updatedRowCount] = await Company.update(
+                {isapplied : true},
+                { where : { hremail : mailOptions.to,}}
+            )
+            if (updatedRowCount > 0) {
+                console.log('Company updated successfully.');
+
+                Company.findAll().then((users) => {
+                    console.log('All users:', users);
+                  });
+              } else {
+                console.log('No Company found with the given condition.');
+              }
+            // sendMail(mailOptions);
         }, delay);
 
         res.json({
@@ -50,9 +90,10 @@ exports.applyJob = async(req, res, next) =>{
             error: 'The target date and time have already passed!',
         });
     }
-   
+}
 
-
-
+exports.allJobs = async(req, res, next) =>{
+    const companies = await Company.findAll(); // Fetch all users
+    res.status(200).json(companies); // Send users as a JSON response
 }
 
