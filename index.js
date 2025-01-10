@@ -16,8 +16,11 @@ app.use(bodyParser.json());
 app.use(express.json());
 
 // Import database and user handling modules
+const { authenticateUser } = require('./src/middlewares/authMiddleware.js'); 
 const { storeUser } = require("./src/controller/user.js");
 const sequelize = require("./src/utils/db.js");
+const { applyJob, allJobs } = require("./src/controller/jobApplication.js");
+const { auth } = require("googleapis/build/src/apis/abusiveexperiencereport/index.js");
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
@@ -97,6 +100,9 @@ app.post('/auth/google/token', async (req, res) => {
   }
 });
 
+app.post('/api/apply', authenticateUser, applyJob);
+
+app.get('/api/getApplied', authenticateUser, allJobs);
 
 // Database connection and server start
 sequelize.authenticate().then(() => {

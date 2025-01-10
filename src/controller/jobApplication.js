@@ -34,23 +34,17 @@ exports.applyJob = async(req, res, next) =>{
         console.log(`Scheduling task to execute in ${delay} milliseconds (UTC time)`);
 
         Company.create({
+            userId : req.user.id,
             name : companyName,
             hrname : hrName,
             hremail : hrEmail,
             maildroptime : targetDateTime,
             subject : subject,
             isapplied : false
-          }).then((company) => {
-            console.log('User created:', company.toJSON());
-
-            // Remove follwing code later
-            Company.findAll().then((users) => {
-                console.log('All users:', users);
-              });
-    
-          });
+          })
 
         const mailOptions = {
+            userId : req.user.id,
             to: hrEmail,
             subject: subject,
             html: html,
@@ -67,7 +61,7 @@ exports.applyJob = async(req, res, next) =>{
             console.log('Executing scheduled task at:', new Date().toISOString());
             const [updatedRowCount] = await Company.update(
                 {isapplied : true},
-                { where : { hremail : mailOptions.to,}}
+                { where : { userId : mailOptions.userId,}}
             )
             if (updatedRowCount > 0) {
                 console.log('Company updated successfully.');
@@ -93,6 +87,7 @@ exports.applyJob = async(req, res, next) =>{
 }
 
 exports.allJobs = async(req, res, next) =>{
+    const userId = req.user.id;
     const companies = await Company.findAll(); // Fetch all users
     res.status(200).json(companies); // Send users as a JSON response
 }

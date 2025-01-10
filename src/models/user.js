@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const sequelize = require('../utils/db');
 
-const User = sequelize.define('Company', {
+const User = sequelize.define('User', {
   googleId: {
     type: DataTypes.STRING,
     allowNull: false,
