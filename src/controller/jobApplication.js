@@ -72,7 +72,7 @@ exports.applyJob = async(req, res, next) =>{
               } else {
                 console.log('No Company found with the given condition.');
               }
-            // sendMail(mailOptions);
+            sendMail(mailOptions, req.user);
         }, delay);
 
         res.json({
@@ -88,7 +88,7 @@ exports.applyJob = async(req, res, next) =>{
 
 exports.allJobs = async(req, res, next) =>{
     const userId = req.user.id;
-    const companies = await Company.findAll(); // Fetch all users
+    const companies = await Company.findAll({ where : { userId : userId}}); // Fetch all users
     res.status(200).json(companies); // Send users as a JSON response
 }
 
