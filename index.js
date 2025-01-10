@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { google } = require('googleapis');
 const bodyParser = require('body-parser');
+const cookieParser = require("cookie-parser"); 
 require('dotenv').config();
 
 const app = express();
@@ -14,10 +15,11 @@ app.use(cors({
 
 app.use(bodyParser.json());
 app.use(express.json());
+app.use(cookieParser()); // Use cookie-parser middleware
 
 // Import database and user handling modules
 const { authenticateUser } = require('./src/middlewares/authMiddleware.js'); 
-const { storeUser } = require("./src/controller/user.js");
+const { storeUser, getUser } = require("./src/controller/user.js");
 const sequelize = require("./src/utils/db.js");
 const { applyJob, allJobs } = require("./src/controller/jobApplication.js");
 const { auth } = require("googleapis/build/src/apis/abusiveexperiencereport/index.js");
@@ -29,16 +31,18 @@ const oauth2Client = new google.auth.OAuth2(
 );
 
 // Step 1: Generate Auth URL (Authorization Code Flow)
-app.get('/auth/google', (req, res) => {
-  const url = oauth2Client.generateAuthUrl({
-    access_type: 'offline',
-    scope: ['email', 'profile'],
+  app.get('/auth/google', (req, res) => {
+    console.log('************************************ INSIDE AUTH GOOGLE *****************');
+    const url = oauth2Client.generateAuthUrl({
+      access_type: 'offline',
+      scope: ['openid','email', 'profile', 'https://mail.google.com/'],
+    });
+    res.redirect(url); // Redirect to Google OAuth
   });
-  res.redirect(url); // Redirect to Google OAuth
-});
 
 // Step 2: Handle OAuth Callback (Authorization Code Flow)
 app.get('/auth/google/callback', async (req, res) => {
+  console.log('************************************ INSIDE AUTH GOOGLE CALLBACK *****************');
   const code = req.query.code; // Authorization code from Google
   if (!code) {
     return res.status(400).json({ error: 'No authorization code provided.' });
@@ -52,11 +56,31 @@ app.get('/auth/google/callback', async (req, res) => {
     const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
     const userInfo = await oauth2.userinfo.get();
 
-    // Store or update the user in the database
     const user = await storeUser(userInfo.data);
+  const userToken = tokens.id_token;
+    // Set tokens in secure, HTTP-only cookies
+
+    res.cookie('userToken', userToken, {
+      httpOnly: true,
+      // secure: process.env.NODE_ENV === 'production',
+      maxAge: tokens.expiry_date - Date.now(),
+  });
+
+    res.cookie('accessToken', tokens.access_token, {
+        httpOnly: true,
+        // secure: process.env.NODE_ENV === 'production',
+        maxAge: tokens.expiry_date - Date.now(),
+    });
+
+    res.cookie('refreshToken', tokens.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
 
     // Send user info to the frontend
-    res.json({ message: 'User logged in successfully!', user: userInfo.data });
+    // res.json({ message: 'User logged in successfully!', user: userInfo.data });
+    res.redirect(`http://localhost:3000/`);
   } catch (error) {
     console.error('Error during authorization code flow:', error);
     res.status(500).json({ error: 'Authentication failed' });
@@ -99,6 +123,8 @@ app.post('/auth/google/token', async (req, res) => {
     res.status(500).json({ error: 'Authentication failed' });
   }
 });
+
+app.get('/user/info', authenticateUser, getUser)
 
 app.post('/api/apply', authenticateUser, applyJob);
 
