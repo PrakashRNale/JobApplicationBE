@@ -14,15 +14,23 @@ const app = express();
 // }));
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://ec2-3-111-32-46.ap-south-1.compute.amazonaws.com:5000'], // Add both dev and prod URLs
-  methods: 'GET, PUT, POST, DELETE',
-  credentials: true, // Ensure cookies are allowed to be sent with requests
+  origin: ['http://localhost:3000', 'http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com'], // Allow both dev and prod frontend URLs
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these HTTP methods
+  credentials: true, // Allow cookies to be sent
 }));
 
+// Add this additional middleware for OPTIONS preflight requests
 app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin); // Dynamically set the origin
   res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end(); // Respond to preflight requests
+  }
   next();
 });
+
 
 app.use(bodyParser.json());
 app.use(express.json());
@@ -109,7 +117,7 @@ app.get('/auth/google/callback', async (req, res) => {
     // res.json({ message: 'User logged in successfully!', user: userInfo.data });
     // res.redirect(`http://localhost:3000/`);  // this is for local
     console.log("********* REDIRECTING BACK TO UI **************");
-    res.redirect(` http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com:/`)
+    res.redirect(`http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com`)
   } catch (error) {
     console.error('Error during authorization code flow:', error);
     res.status(500).json({ error: 'Authentication failed' });
