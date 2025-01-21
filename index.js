@@ -7,11 +7,22 @@ require('dotenv').config();
 
 const app = express();
 
+// app.use(cors({
+//   origin: 'http://localhost:3000', // Frontend URL
+//   methods: 'GET, PUT, POST, DELETE',
+//   credentials: true,              // Allow cookies or credentials
+// }));
+
 app.use(cors({
-  origin: 'http://localhost:3000', // Frontend URL
+  origin: ['http://localhost:3000', 'http://ec2-3-111-32-46.ap-south-1.compute.amazonaws.com:5000'], // Add both dev and prod URLs
   methods: 'GET, PUT, POST, DELETE',
-  credentials: true,              // Allow cookies or credentials
+  credentials: true, // Ensure cookies are allowed to be sent with requests
 }));
+
+app.use((req, res, next) => {
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+});
 
 app.use(bodyParser.json());
 app.use(express.json());
@@ -24,10 +35,14 @@ const sequelize = require("./src/utils/db.js");
 const { applyJob, allJobs } = require("./src/controller/jobApplication.js");
 const { auth } = require("googleapis/build/src/apis/abusiveexperiencereport/index.js");
 
+
+console.log("URL for redirectin is "+process.env.CALLBACK_URL)
+
+// use this for local   'http://localhost:8000/auth/google/callback'     'http://ec2-3-111-32-46.ap-south-1.compute.amazonaws.com:5000/auth/google/callback'
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  process.env.CALLBACK_URL   //'http://localhost:8000/auth/google/callback'  use this for local
+  'http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com:5000/auth/google/callback'
 );
 
 // Step 1: Generate Auth URL (Authorization Code Flow)
@@ -36,10 +51,15 @@ const oauth2Client = new google.auth.OAuth2(
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: ['openid','email', 'profile', 'https://mail.google.com/'],
+      // redirect_uri: ' http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com:5000/auth/google/callback',
+                       
     });
+    console.log('************************************ URL GENERATED IS*****************');
+    console.log(url);
     res.redirect(url); // Redirect to Google OAuth
   });
 
+ 
 // Step 2: Handle OAuth Callback (Authorization Code Flow)
 app.get('/auth/google/callback', async (req, res) => {
   console.log('************************************ INSIDE AUTH GOOGLE CALLBACK *****************');
@@ -62,25 +82,34 @@ app.get('/auth/google/callback', async (req, res) => {
 
     res.cookie('userToken', userToken, {
       httpOnly: true,
-      // secure: process.env.NODE_ENV === 'production',
+      secure: false, // Use true in production for HTTPS
+      sameSite: 'Lax', // Lax works for HTTP, 'None' for cross-origin requests
       maxAge: tokens.expiry_date - Date.now(),
-  });
+      path: '/', // Ensure it can be accessed on all paths
+    });
 
     res.cookie('accessToken', tokens.access_token, {
-        httpOnly: true,
-        // secure: process.env.NODE_ENV === 'production',
-        maxAge: tokens.expiry_date - Date.now(),
+      httpOnly: true,
+      secure: false, // Use true in production for HTTPS
+      sameSite: 'Lax', // Lax works for HTTP, 'None' for cross-origin requests
+      maxAge: tokens.expiry_date - Date.now(),
+      path: '/', 
     });
 
     res.cookie('refreshToken', tokens.refresh_token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === 'production',
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      httpOnly: true,
+      secure: false, // Use true in production for HTTPS
+      sameSite: 'Lax', // Lax works for HTTP, 'None' for cross-origin requests
+      maxAge: tokens.expiry_date - Date.now(),
+      path: '/', 
     });
+    console.log('+++++++++++++++COOKIES ARE CREATED+++++++++++++')
 
     // Send user info to the frontend
     // res.json({ message: 'User logged in successfully!', user: userInfo.data });
-    res.redirect(`http://localhost:3000/`);
+    // res.redirect(`http://localhost:3000/`);  // this is for local
+    console.log("********* REDIRECTING BACK TO UI **************");
+    res.redirect(` http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com:/`)
   } catch (error) {
     console.error('Error during authorization code flow:', error);
     res.status(500).json({ error: 'Authentication failed' });
@@ -137,3 +166,4 @@ sequelize.authenticate().then(() => {
 }).catch(err => {
   console.error('Database connection failed:', err);
 });
+
