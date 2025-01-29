@@ -29,6 +29,27 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     allowNull: false,
     defaultValue: false,
+  },
+  linkedinProfile : {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  leetcodeProfile : {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  githubProfile : {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  technologies : {
+    type: DataTypes.STRING,
+    allowNull: true,
+  },
+  isCVUploaded : {
+    type: DataTypes.BOOLEAN,
+    allowNull: true,
+    defaultValue: false
   }
 });
 
