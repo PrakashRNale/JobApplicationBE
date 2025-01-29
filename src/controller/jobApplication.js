@@ -32,7 +32,7 @@ const getUserProfiles = async (userId) =>{
     let divContent = '';
 
     for(let key in userProfiles){
-        divContent += `<div><span>My ${PROFILES[key]} Profile is : </span> <a target="_blank" href=${userProfiles[key]}>LinkedIn</a>  </div>`
+        divContent += `<div><span>My ${PROFILES[key]} Profile is : </span> <a target="_blank" href=${userProfiles[key]}>${PROFILES[key]}</a>  </div>`
     }
 
     const profiles = `<div>${divContent}</div>`;
