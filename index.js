@@ -163,6 +163,14 @@ app.post('/auth/google/token', async (req, res) => {
   }
 });
 
+app.post('/auth/logout', (req, res) => {
+  res.clearCookie('userToken', { path: '/' });
+  res.clearCookie('accessToken', { path: '/' });
+  res.clearCookie('refreshToken', { path: '/' });
+
+  res.json({ message: 'User logged out successfully' });
+});
+
 app.get('/user/info', authenticateUser, getUser);
 
 app.post('/user/setUser', authenticateUser, modifyUserDetails)
