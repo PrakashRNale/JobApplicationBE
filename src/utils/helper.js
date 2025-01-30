@@ -1,3 +1,5 @@
+const { DUMMYCOMPANIES } = require("../Constants/DummyCompanies");
+
 exports.getDelay = (futureTime) =>{
 
     // Parse the target date-time as UTC
@@ -7,4 +9,17 @@ exports.getDelay = (futureTime) =>{
     console.log('Current time in UTC==>  '+currentDateTimeUTC)
 
     return targetDateTimeUTC - currentDateTimeUTC;
+}
+
+exports.dummyCompaniesForUnauthorizedUser = () =>{
+    const dummyCompanies = DUMMYCOMPANIES.map((company, i) =>{
+        const newDate = new Date();
+
+        return {
+            ...company,
+            maildroptime : newDate.setHours(newDate.getHours() + (i * 5))
+        }
+    })
+
+    return dummyCompanies;
 }

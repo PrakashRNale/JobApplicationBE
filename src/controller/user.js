@@ -33,6 +33,39 @@ exports.storeUser = async (googleProfile) => {
     }
 }
 
+exports.modifyUserDetails = async (req, res, next) =>{
+
+    try {
+        const linkedinProfile = req.body.linkedinProfile;
+        const githubProfile = req.body.githubProfile;
+        const leetcodeProfile = req.body.leetcodeProfile;
+        const technologies = req.body.technologies;
+    
+        const modifiedUserDetails = {
+            ...(linkedinProfile ? { 'linkedinProfile': linkedinProfile } : {}),
+            ...(githubProfile ? { 'githubProfile': githubProfile } : {}),
+            ...(leetcodeProfile ? { 'leetcodeProfile': leetcodeProfile } : {}),
+            ...(technologies ? { 'technologies': technologies } : {}),
+        };
+         
+    
+        const updatedCount = await User.update(
+            {...modifiedUserDetails},
+            { where : { googleId : req.user.id}}
+        )
+
+        if(updatedCount > 0){
+            res.json({
+                message : 'User modified successfully',
+            })
+        }
+
+    } catch (error) {
+        console.log("Something went wrong while submitting user details")
+    }
+
+}
+
 exports.getUser = async (req, res, next) =>{
     try {
         const userId = req.user.id;

@@ -3,6 +3,7 @@ const cors = require("cors");
 const { google } = require('googleapis');
 const bodyParser = require('body-parser');
 const cookieParser = require("cookie-parser"); 
+const multer = require("multer");
 require('dotenv').config();
 
 const app = express();
@@ -31,17 +32,17 @@ app.use((req, res, next) => {
   next();
 });
 
-
 app.use(bodyParser.json());
 app.use(express.json());
 app.use(cookieParser()); // Use cookie-parser middleware
 
 // Import database and user handling modules
 const { authenticateUser } = require('./src/middlewares/authMiddleware.js'); 
-const { storeUser, getUser } = require("./src/controller/user.js");
+const { storeUser, getUser, modifyUserDetails } = require("./src/controller/user.js");
 const sequelize = require("./src/utils/db.js");
 const { applyJob, allJobs } = require("./src/controller/jobApplication.js");
 const { auth } = require("googleapis/build/src/apis/abusiveexperiencereport/index.js");
+const upload = multer();
 
 
 console.log("URL for redirectin is "+process.env.CALLBACK_URL)
@@ -50,7 +51,7 @@ console.log("URL for redirectin is "+process.env.CALLBACK_URL)
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  'http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com:5000/auth/google/callback'
+  process.env.LOCAL_CALLBACK_URL
 );
 
 // Step 1: Generate Auth URL (Authorization Code Flow)
@@ -117,7 +118,8 @@ app.get('/auth/google/callback', async (req, res) => {
     // res.json({ message: 'User logged in successfully!', user: userInfo.data });
     // res.redirect(`http://localhost:3000/`);  // this is for local
     console.log("********* REDIRECTING BACK TO UI **************");
-    res.redirect(`http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com`)
+    // res.redirect(`http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com`);
+    res.redirect(`http://localhost:3000/`);  // this is for local
   } catch (error) {
     console.error('Error during authorization code flow:', error);
     res.status(500).json({ error: 'Authentication failed' });
@@ -161,9 +163,19 @@ app.post('/auth/google/token', async (req, res) => {
   }
 });
 
-app.get('/user/info', authenticateUser, getUser)
+app.post('/auth/logout', (req, res) => {
+  res.clearCookie('userToken', { path: '/' });
+  res.clearCookie('accessToken', { path: '/' });
+  res.clearCookie('refreshToken', { path: '/' });
 
-app.post('/api/apply', authenticateUser, applyJob);
+  res.json({ message: 'User logged out successfully' });
+});
+
+app.get('/user/info', authenticateUser, getUser);
+
+app.post('/user/setUser', authenticateUser, modifyUserDetails)
+
+app.post('/api/apply', upload.single("file"), authenticateUser, applyJob);
 
 app.get('/api/getApplied', authenticateUser, allJobs);
 

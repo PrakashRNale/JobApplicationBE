@@ -1,10 +1,17 @@
 const { OAuth2Client } = require('google-auth-library');
+const { dummyCompaniesForUnauthorizedUser } = require('../utils/helper');
 const oauth2Client = new OAuth2Client(process.env.CLIENT_ID); // Use your Google Client ID
 
 exports.authenticateUser = async (req, res, next) => {
   const authHeader = req?.cookies?.userToken;
 
   if (!authHeader) {
+
+    if (req.path === "/api/getApplied") {
+      const responseData = dummyCompaniesForUnauthorizedUser();
+      return res.status(200).json(responseData);
+    }
+
     return res.status(401).json({ error: 'Unauthorized: Token missing' });
   }
 
@@ -16,6 +23,17 @@ exports.authenticateUser = async (req, res, next) => {
       idToken: token,
       audience: process.env.CLIENT_ID, // Ensure this matches your Google Client ID
     });
+
+
+    if (!ticket) {
+
+      if (req.path === "/api/getApplied") {
+        const responseData = dummyCompaniesForUnauthorizedUser();
+        return res.status(200).json(responseData);
+      }
+
+      return res.status(401).json({ error: "Unauthorized: Invalid ticket" });
+    }
 
     const payload = ticket.getPayload(); // Extract user info
     req.user = {

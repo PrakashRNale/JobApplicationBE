@@ -24,13 +24,14 @@ const getS3File = async (bucketName, key) => {
 }
 
 // Function to upload a file to S3
-async function uploadFileToS3(bucketName, key, filePath) {
-    const fileContent = fs.readFileSync(filePath); // Read the file locally
+async function uploadFileToS3(bucketName, key, fileBuffer, mimeType) {
+    // const fileStream = fs.createReadStream(filePath); // Stream the file
 
     const params = {
         Bucket: bucketName,
         Key: key,
-        Body: fileContent,
+        Body: fileBuffer, // Pass the buffer directly
+        ContentType: mimeType, // Optional: Set MIME type
     };
 
     try {
@@ -43,4 +44,7 @@ async function uploadFileToS3(bucketName, key, filePath) {
     }
 }
 
-module.exports = getS3File;
+module.exports = { 
+    getS3File,
+    uploadFileToS3
+}
