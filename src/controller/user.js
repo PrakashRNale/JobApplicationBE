@@ -40,12 +40,14 @@ exports.modifyUserDetails = async (req, res, next) =>{
         const githubProfile = req.body.githubProfile;
         const leetcodeProfile = req.body.leetcodeProfile;
         const technologies = req.body.technologies;
+        const expYears = req.body.expYears;
     
         const modifiedUserDetails = {
             ...(linkedinProfile ? { 'linkedinProfile': linkedinProfile } : {}),
             ...(githubProfile ? { 'githubProfile': githubProfile } : {}),
             ...(leetcodeProfile ? { 'leetcodeProfile': leetcodeProfile } : {}),
             ...(technologies ? { 'technologies': technologies } : {}),
+            ...(expYears ? { 'expYears': expYears } : {}),
         };
          
     
@@ -61,7 +63,8 @@ exports.modifyUserDetails = async (req, res, next) =>{
         }
 
     } catch (error) {
-        console.log("Something went wrong while submitting user details")
+        console.log("Something went wrong while submitting user details", error);
+        res.status(500).json({ error: 'Failed while updating user' });
     }
 
 }

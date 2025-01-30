@@ -5,9 +5,12 @@
 </head>
 <body>
     <span>Hi <%= hrName %>,</span>
-    <p>I am <%= userName %>, I have very good experience in technologies like <%= technologies %>. I have solved more than 150 problems on Data Structure and Algorithms and have a good grasp on it.</p>
-    <p><%- profiles %></p>
-    <p>There is an opening in your organization for the same skill set that I have experience. So I am applying for that position . I have attached my updated resume along with this mail. </p>
+    <p>I hope you are doing well. My name is <%= userName %>, and I am excited to apply for the  <%= role %> position at <%= companyName %>. I have total <%= yearsOfExperience %> experience. Also I am very good in technologies like <%= technologies %>. Additionally, I have solved over 150 problems in Data Structures and Algorithms, which has strengthened my problem-solving skills and technical proficiency.</p>
+    <p>You can find more details about my work and experience here:
+        <%- profiles %>
+    </p>
+    <p>Given that this role aligns perfectly with my skill set and experience, I am eager for the opportunity to contribute to your team. Please find my updated resume attached for your reference. </p>
+    <p>I would love the chance to discuss how my expertise can add value to <%= companyName %>. Looking forward to your response.</p>
     <p>Thanks & Regards, </p>
     <p><%= userName %> </p>
 </body>

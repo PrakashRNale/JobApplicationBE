@@ -9,145 +9,159 @@ const multer = require("multer");
 const User = require("../models/user");
 const PROFILES = require("../Constants/Enum");
 
-sequelize.sync({ force: true }) // Set `force: true` to drop tables and recreate them
-.then(() => {
-  console.log('Database & tables created!');
-})
-.catch((error) => {
-  console.error('Error syncing database:', error);
-});
+// Sync Sequelize models, ensuring tables are created, but without dropping existing data
+sequelize.sync({ force: true })
+  .then(() => {
+    console.log('Database & tables synced!');
+  })
+  .catch((error) => {
+    console.error('Error syncing database:', error);
+  });
 
 // Configure Multer
 const upload = multer({ dest: "uploads/" });
 
-const getUserProfiles = async (userId) =>{
-    let userInfo = await User.findAll({ where : { googleId : userId}});
-    userInfo = userInfo[0];
+const getUserProfiles = async (userId) => {
+  try {
+    let userInfo = await User.findOne({ where : { googleId : userId }});
+    if (!userInfo) {
+        throw new Error('User not found');
+    }
+
     const userProfiles = {
         ...(userInfo.linkedinProfile ? { 'linkedinProfile': userInfo.linkedinProfile } : {}),
         ...(userInfo.githubProfile ? { 'githubProfile': userInfo.githubProfile } : {}),
         ...(userInfo.leetcodeProfile ? { 'leetcodeProfile': userInfo.leetcodeProfile } : {}),
     };
 
-    let divContent = '';
+    let listContent = '';
 
     for(let key in userProfiles){
-        divContent += `<div><span>My ${PROFILES[key]} Profile is : </span> <a target="_blank" href=${userProfiles[key]}>${PROFILES[key]}</a>  </div>`
+      listContent += `<li><a target="_blank" href=${userProfiles[key]}>${PROFILES[key]}</a>  </li>`;
     }
 
-    const profiles = `<div>${divContent}</div>`;
+    const profiles = `<ul>${listContent}</ul>`;
 
     const technologies = userInfo.technologies || "";
 
-     
-    const userDatqa ={ 
-        userName : userInfo.name,
+    return { 
+        userName: userInfo.name,
         profiles,
-        technologies
+        technologies,
+        yearsOfExperience : userInfo.expYears || 0
     };
-
-    return userDatqa;
+  } catch (error) {
+    console.log('Error while retriving user details ', error);
+    throw error;
+  }
+ 
 }
 
-exports.applyJob = async(req, res, next) =>{
-    // Path to the EJS template
-    const bucketName = process.env.AWS_BUCKET_NAME; 
-    const file = req.file;
-    const S3Key = req.user.id;
-    const templatePath = path.join(__dirname, '..', 'views', 'email-templates', `job-application.ejs`);
-    
-    let fileContent;
+const handleFileUpload = async (req) => {
+    try {
 
-    if(file){
-        fileContent = file.buffer;
-        const mimeType = file.mimetype;
-        uploadFileToS3(bucketName, S3Key, fileContent, mimeType).then(async res =>{
-            const [updatedRowCount] = await User.update(
-                {isCVUploaded : true},
-                { where : { googleId : mailOptions.userId,}}
-            )
+      const file = req.file;
+      if (!file) return null;
+  
+      const S3Key = req.user?.id || '';
+      const fileContent = file.buffer;
+      const mimeType = file.mimetype;
+      await uploadFileToS3(process.env.AWS_BUCKET_NAME, S3Key, fileContent, mimeType);
+      const [updatedRowCount] = await User.update(
+          {isCVUploaded : true},
+          { where : { googleId : S3Key}} // her S3Key is nothing but user id
+      )
+  
+      if(updatedRowCount > 1){
+          console.log('user updated successfully');
+      }
+      return fileContent;
+      
+    } catch (error) {
+      console.log('Something went wrong while uploading files to S3 ', error);
+      throw error;
+    }
 
-            if(updatedRowCount > 1){
-                console.log('user updated successfully');
-            }
-        }).catch(err =>{
+};
 
-        })
-    }else{
+const scheduleEmailSending = async ({ companyName, hrEmail, hrName, emailSubject, html, dateTime, fileContent, delay, user }) => {
+
+    try {
+      
+      // Ensure the necessary data is passed to the function
+      if (!companyName || !hrEmail || !emailSubject || !html || !fileContent) {
+          throw new Error('Missing required fields for email scheduling');
+      }
+
+      await Company.create({
+        userId: user.id,
+        name: companyName,
+        hrname: hrName, // Using user.name for the HR name, check if it's correct
+        hremail: hrEmail,
+        maildroptime: dateTime,
+        subject : emailSubject,
+        isapplied: false,
+      });
+
+      const mailOptions = {
+        userId: user.id,
+        to: hrEmail,
+        subject: emailSubject,
+        html: html,
+        attachments: [{ filename: `${user.name}_CV.pdf`, content: fileContent }],
+      };
+
+      setTimeout(async () => {
+        await Company.update({ isapplied: true }, { where: { userId: user.id } });
+        sendMail(mailOptions, user);
+      }, delay);
+
+    } catch (error) {
+        console.log('Something went worng while sending mail ',error);
+        throw error;
+    }
+};
+
+exports.applyJob = async (req, res, next) => {
+    try {
+      const { companyName, hrEmail, role, hrName, dateTime } = req.body;
+      let fileContent;
+
+      const S3Key = req.user?.id || '';
+
+      if(req.file){
+        fileContent = req.file.buffer;
+        handleFileUpload(req);
+      }else{
         fileContent = await getS3File(process.env.AWS_BUCKET_NAME, S3Key) || "";
+      }
+
+      const emailSubject = "Applying for "+role;
+
+      const userData = await getUserProfiles(req.user.id);
+      const html = await ejs.renderFile(path.join(__dirname, '..', 'views', 'email-templates', 'job-application.ejs'), { hrName, role, companyName, ...userData });
+
+      const delay = getDelay(dateTime);
+      if (delay <= 0) {
+        return res.status(400).json({ error: 'The target date and time have already passed!' });
+      }
+      const user = req.user;
+      await scheduleEmailSending({ companyName, hrEmail, hrName, emailSubject, html, dateTime, fileContent, delay, user });
+
+      res.json({ message: 'Email will be sent at the mentioned time' });
+    } catch (error) {
+      console.error('Error applying for job:', error);
+      res.status(500).json({ error: 'Job application failed' });
     }
-
-    const { companyName,  hrEmail, subject, hrName, dateTime  } = req.body;
-
-    // Render the template with provided data
-    console.log('************************ RECEIVED FILE *******************************')
-    
-    const userData = await getUserProfiles(req.user.id);
-    const fileName = `${userData.userName}_CV.pdf`;
-
-    const html = await ejs.renderFile(templatePath, {hrName : hrName, ...userData});
-    
-    const delay = getDelay(dateTime);
-
-    if (delay > 0) {
-        console.log(`Scheduling task to execute in ${delay} milliseconds (UTC time)`);
-
-        Company.create({
-            userId : req.user.id,
-            name : companyName,
-            hrname : hrName,
-            hremail : hrEmail,
-            maildroptime : dateTime,
-            subject : subject,
-            isapplied : false
-          })
-
-        const mailOptions = {
-            userId : req.user.id,
-            to: hrEmail,
-            subject: subject,
-            html: html,
-            attachments: [
-                {
-                    filename: fileName,
-                    content: fileContent, // File content from S3
-                },
-            ],
-        };
-
-        // Schedule the task
-        setTimeout(async () => {
-            console.log('Executing scheduled task at:', new Date().toISOString());
-            const [updatedRowCount] = await Company.update(
-                {isapplied : true},
-                { where : { userId : mailOptions.userId,}}
-            )
-            if (updatedRowCount > 0) {
-                console.log('Company updated successfully.');
-
-                Company.findAll().then((users) => {
-                    console.log('All users:', users);
-                  });
-              } else {
-                console.log('No Company found with the given condition.');
-              }
-            sendMail(mailOptions, req.user);
-        }, delay);
-
-        res.json({
-            message : 'Email will be sent at mentioned time'
-        })
-
-    } else {
-        return res.status(400).json({
-            error: 'The target date and time have already passed!',
-        });
-    }
-}
+};
 
 exports.allJobs = async(req, res, next) =>{
-    const userId = req.user.id;
-    const companies = await Company.findAll({ where : { userId : userId}}); // Fetch all users
-    res.status(200).json(companies); // Send users as a JSON response
-}
-
+    try {
+      const userId = req.user.id;
+      const companies = await Company.findAll({ where: { userId }});
+      res.status(200).json(companies); // Send users as a JSON response
+    } catch (error) {
+      console.error('Error fetching jobs:', error);
+      res.status(500).json({ error: 'Failed to fetch jobs' });
+    }
+};

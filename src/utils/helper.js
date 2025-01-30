@@ -1,25 +1,34 @@
 const { DUMMYCOMPANIES } = require("../Constants/DummyCompanies");
 
-exports.getDelay = (futureTime) =>{
+exports.getDelay = (futureTime) => {
+    try {
+        // Parse the target date-time as UTC
+        const targetDateTimeUTC = new Date(futureTime); // Ensure this is in ISO format
+        const currentDateTimeUTC = new Date(); // The server's current time in UTC
 
-    // Parse the target date-time as UTC
-    const targetDateTimeUTC = new Date(futureTime); // Ensure this is in ISO format
-    console.log('Converted local time to UTC==>  '+targetDateTimeUTC)
-    const currentDateTimeUTC = new Date(); // The server's current time in UTC
-    console.log('Current time in UTC==>  '+currentDateTimeUTC)
+        // Return the delay in milliseconds
+        return targetDateTimeUTC - currentDateTimeUTC;
+    } catch (error) {
+        console.error('Error calculating delay:', error.message); // Log the error message only
+        throw new Error('Unable to calculate delay.'); // Throw a generic error to avoid leaking sensitive info
+    }
+};
 
-    return targetDateTimeUTC - currentDateTimeUTC;
-}
+exports.dummyCompaniesForUnauthorizedUser = () => {
+    try {
+        const dummyCompanies = DUMMYCOMPANIES.map((company, i) => {
+            const newDate = new Date();
+            newDate.setHours(newDate.getHours() + (i * 5)); // Increment hours by 5 for each company
 
-exports.dummyCompaniesForUnauthorizedUser = () =>{
-    const dummyCompanies = DUMMYCOMPANIES.map((company, i) =>{
-        const newDate = new Date();
+            return {
+                ...company,
+                maildroptime: newDate, // Set the calculated date
+            };
+        });
 
-        return {
-            ...company,
-            maildroptime : newDate.setHours(newDate.getHours() + (i * 5))
-        }
-    })
-
-    return dummyCompanies;
-}
+        return dummyCompanies;
+    } catch (error) {
+        console.error('Error generating dummy companies:', error.message); // Log the error message only
+        throw new Error('Unable to generate dummy companies.'); // Throw a generic error to avoid leaking sensitive info
+    }
+};

@@ -6,13 +6,21 @@ const cookieParser = require("cookie-parser");
 const multer = require("multer");
 require('dotenv').config();
 
-const app = express();
 
-// app.use(cors({
-//   origin: 'http://localhost:3000', // Frontend URL
-//   methods: 'GET, PUT, POST, DELETE',
-//   credentials: true,              // Allow cookies or credentials
-// }));
+//This code is added to atch unhandled promise rejections globally. SO THAT APP WILL NOT CRASH IN CASE OF ANY EXCEPTION OR ERROR
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1); // Exit the process with a failure status to avoid running with an invalid state
+});
+
+
+//This code is added to catch unhandled promise rejections globally. SO THAT APP WILL NOT CRASH IN CASE OF ANY EXCEPTION OR ERROR
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  process.exit(1); // Exit the process with a failure status to avoid running with an invalid state
+});
+
+const app = express();
 
 app.use(cors({
   origin: ['http://localhost:3000', 'http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com'], // Allow both dev and prod frontend URLs
@@ -54,6 +62,19 @@ const oauth2Client = new google.auth.OAuth2(
   process.env.LOCAL_CALLBACK_URL
 );
 
+const setCookies = (res, tokens) => {
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production', // Secure cookies in production
+    sameSite: 'Lax',
+    maxAge: tokens.expiry_date - Date.now(),
+    path: '/',
+  };
+  res.cookie('userToken', tokens.id_token, cookieOptions);
+  res.cookie('accessToken', tokens.access_token, cookieOptions);
+  res.cookie('refreshToken', tokens.refresh_token, cookieOptions);
+};
+
 // Step 1: Generate Auth URL (Authorization Code Flow)
   app.get('/auth/google', (req, res) => {
     console.log('************************************ INSIDE AUTH GOOGLE *****************');
@@ -69,62 +90,28 @@ const oauth2Client = new google.auth.OAuth2(
   });
 
  
-// Step 2: Handle OAuth Callback (Authorization Code Flow)
-app.get('/auth/google/callback', async (req, res) => {
-  console.log('************************************ INSIDE AUTH GOOGLE CALLBACK *****************');
-  const code = req.query.code; // Authorization code from Google
-  if (!code) {
-    return res.status(400).json({ error: 'No authorization code provided.' });
-  }
+  app.get('/auth/google/callback', async (req, res) => {
+    try {
+      const code = req.query.code;
+      if (!code) throw new Error('Authorization code missing');
   
-  try {
-    const { tokens } = await oauth2Client.getToken(code); // Exchange code for tokens
-    oauth2Client.setCredentials(tokens);
-
-    // Fetch user info
-    const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
-    const userInfo = await oauth2.userinfo.get();
-
-    const user = await storeUser(userInfo.data);
-  const userToken = tokens.id_token;
-    // Set tokens in secure, HTTP-only cookies
-
-    res.cookie('userToken', userToken, {
-      httpOnly: true,
-      secure: false, // Use true in production for HTTPS
-      sameSite: 'Lax', // Lax works for HTTP, 'None' for cross-origin requests
-      maxAge: tokens.expiry_date - Date.now(),
-      path: '/', // Ensure it can be accessed on all paths
-    });
-
-    res.cookie('accessToken', tokens.access_token, {
-      httpOnly: true,
-      secure: false, // Use true in production for HTTPS
-      sameSite: 'Lax', // Lax works for HTTP, 'None' for cross-origin requests
-      maxAge: tokens.expiry_date - Date.now(),
-      path: '/', 
-    });
-
-    res.cookie('refreshToken', tokens.refresh_token, {
-      httpOnly: true,
-      secure: false, // Use true in production for HTTPS
-      sameSite: 'Lax', // Lax works for HTTP, 'None' for cross-origin requests
-      maxAge: tokens.expiry_date - Date.now(),
-      path: '/', 
-    });
-    console.log('+++++++++++++++COOKIES ARE CREATED+++++++++++++')
-
-    // Send user info to the frontend
-    // res.json({ message: 'User logged in successfully!', user: userInfo.data });
-    // res.redirect(`http://localhost:3000/`);  // this is for local
-    console.log("********* REDIRECTING BACK TO UI **************");
-    // res.redirect(`http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com`);
-    res.redirect(`http://localhost:3000/`);  // this is for local
-  } catch (error) {
-    console.error('Error during authorization code flow:', error);
-    res.status(500).json({ error: 'Authentication failed' });
-  }
-});
+      const { tokens } = await oauth2Client.getToken(code);
+      oauth2Client.setCredentials(tokens);
+  
+      const oauth2 = google.oauth2({ version: 'v2', auth: oauth2Client });
+      const userInfo = await oauth2.userinfo.get();
+  
+      const user = await storeUser(userInfo.data);
+  
+      // Set cookies with user data
+      setCookies(res, tokens);
+  
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+    } catch (error) {
+      console.error('Error during callback:', error);
+      res.status(500).json({ error: 'Authentication failed' });
+    }
+  });
 
 // Step 3: Handle Implicit Flow (Frontend sends token)
 app.post('/auth/google/token', async (req, res) => {
@@ -178,6 +165,11 @@ app.post('/user/setUser', authenticateUser, modifyUserDetails)
 app.post('/api/apply', upload.single("file"), authenticateUser, applyJob);
 
 app.get('/api/getApplied', authenticateUser, allJobs);
+
+app.use((err, req, res, next) => {
+  console.error('Unhandled Error:', err.message); // Log the error message
+  res.status(500).json({ error: 'Something went wrong. Please try again later. testing' });
+});
 
 // Database connection and server start
 sequelize.authenticate().then(() => {
