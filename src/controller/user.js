@@ -73,6 +73,11 @@ exports.getUser = async (req, res, next) =>{
     try {
         const userId = req.user.id;
         const userInfo = await User.findAll({ where : { googleId : userId}}); // Fetch all users
+        console.log("***************** returning users **************");
+        console.log(userInfo);
+        if(!userInfo.length){
+            res.status(401).json({ error: 'No User found' });
+        }
         res.json(userInfo[0]);
     } catch (error) {
         console.error('Error fetching user info:', error);

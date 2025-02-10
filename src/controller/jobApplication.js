@@ -2,7 +2,6 @@ const sendMail = require("../utils/mail");
 const ejs = require('ejs');
 const path = require('path');
 const { getS3File, uploadFileToS3 } = require("../utils/s3");
-const { getDelay } = require("../utils/helper");
 const sequelize = require("../utils/db");
 const Company = require("../models/company");
 const multer = require("multer");
@@ -10,7 +9,7 @@ const User = require("../models/user");
 const PROFILES = require("../Constants/Enum");
 
 // Sync Sequelize models, ensuring tables are created, but without dropping existing data
-sequelize.sync({ force: true })
+sequelize.sync({ alter: true })
   .then(() => {
     console.log('Database & tables synced!');
   })
@@ -84,7 +83,7 @@ const handleFileUpload = async (req) => {
 
 };
 
-const scheduleEmailSending = async ({ companyName, hrEmail, hrName, emailSubject, html, dateTime, fileContent, delay, user }) => {
+const scheduleEmailSending = async ({ companyName, hrEmail, hrName, emailSubject, html, dateTime, fileContent, sendMailAfterMilliseconds, user }) => {
 
     try {
       
@@ -114,7 +113,7 @@ const scheduleEmailSending = async ({ companyName, hrEmail, hrName, emailSubject
       setTimeout(async () => {
         await Company.update({ isapplied: true }, { where: { userId: user.id } });
         sendMail(mailOptions, user);
-      }, delay);
+      }, sendMailAfterMilliseconds);
 
     } catch (error) {
         console.log('Something went worng while sending mail ',error);
@@ -124,14 +123,17 @@ const scheduleEmailSending = async ({ companyName, hrEmail, hrName, emailSubject
 
 exports.applyJob = async (req, res, next) => {
     try {
-      const { companyName, hrEmail, role, hrName, dateTime } = req.body;
+      const { companyName, hrEmail, role, hrName, dateTime, sendMailAfterMilliseconds } = req.body;
       let fileContent;
 
       const S3Key = req.user?.id || '';
 
       if(req.file){
         fileContent = req.file.buffer;
-        handleFileUpload(req);
+        handleFileUpload(req).catch((error) => {
+          console.error('Error during file upload:', error);
+          // Handle the file upload error separately here if necessary
+        });
       }else{
         fileContent = await getS3File(process.env.AWS_BUCKET_NAME, S3Key) || "";
       }
@@ -141,12 +143,11 @@ exports.applyJob = async (req, res, next) => {
       const userData = await getUserProfiles(req.user.id);
       const html = await ejs.renderFile(path.join(__dirname, '..', 'views', 'email-templates', 'job-application.ejs'), { hrName, role, companyName, ...userData });
 
-      const delay = getDelay(dateTime);
-      if (delay <= 0) {
+      if (sendMailAfterMilliseconds <= 0) {
         return res.status(400).json({ error: 'The target date and time have already passed!' });
       }
       const user = req.user;
-      await scheduleEmailSending({ companyName, hrEmail, hrName, emailSubject, html, dateTime, fileContent, delay, user });
+      await scheduleEmailSending({ companyName, hrEmail, hrName, emailSubject, html, dateTime, fileContent, sendMailAfterMilliseconds, user });
 
       res.json({ message: 'Email will be sent at the mentioned time' });
     } catch (error) {

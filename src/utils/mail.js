@@ -3,6 +3,7 @@ require('dotenv').config();
 
 // Function to send an email
 const sendMail = async (mailOptions, user) => {
+    console.log('**************** Inside Send mail ****************');
     const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -14,11 +15,18 @@ const sendMail = async (mailOptions, user) => {
         },
     });
 
+    console.log('**************** User TOken is ****************');
+    console.log(user.accessToken);
+    console.log('**************** User email is ****************');
+    console.log(user.email);
+
     // Prepare mail options with user's email as sender
     const mailConfig = {
         ...mailOptions,
         from: user.email,
     };
+
+
 
     try {
         const result = await transporter.sendMail(mailConfig);

@@ -10,20 +10,13 @@ require('dotenv').config();
 //This code is added to atch unhandled promise rejections globally. SO THAT APP WILL NOT CRASH IN CASE OF ANY EXCEPTION OR ERROR
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1); // Exit the process with a failure status to avoid running with an invalid state
-});
-
-
-//This code is added to catch unhandled promise rejections globally. SO THAT APP WILL NOT CRASH IN CASE OF ANY EXCEPTION OR ERROR
-process.on('unhandledRejection', (reason, promise) => {
-  console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-  process.exit(1); // Exit the process with a failure status to avoid running with an invalid state
+  // process.exit(1); // Exit the process with a failure status to avoid running with an invalid state
 });
 
 const app = express();
 
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com'], // Allow both dev and prod frontend URLs
+  origin: [process.env.LOCAL_FRONTEND_URL, process.env.FRONTEND_URL], // Allow both dev and prod frontend URLs
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'], // Allow these HTTP methods
   credentials: true, // Allow cookies to be sent
 }));
@@ -55,11 +48,10 @@ const upload = multer();
 
 console.log("URL for redirectin is "+process.env.CALLBACK_URL)
 
-// use this for local   'http://localhost:8000/auth/google/callback'     'http://ec2-3-111-32-46.ap-south-1.compute.amazonaws.com:5000/auth/google/callback'
 const oauth2Client = new google.auth.OAuth2(
   process.env.CLIENT_ID,
   process.env.CLIENT_SECRET,
-  process.env.LOCAL_CALLBACK_URL
+  process.env.CALLBACK_URL
 );
 
 const setCookies = (res, tokens) => {
@@ -81,7 +73,7 @@ const setCookies = (res, tokens) => {
     const url = oauth2Client.generateAuthUrl({
       access_type: 'offline',
       scope: ['openid','email', 'profile', 'https://mail.google.com/'],
-      // redirect_uri: ' http://ec2-35-154-131-168.ap-south-1.compute.amazonaws.com:5000/auth/google/callback',
+      redirect_uri: process.env.CALLBACK_URL,
                        
     });
     console.log('************************************ URL GENERATED IS*****************');
@@ -106,7 +98,7 @@ const setCookies = (res, tokens) => {
       // Set cookies with user data
       setCookies(res, tokens);
   
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}`);
+      res.redirect(`${process.env.FRONTEND_URL}`);
     } catch (error) {
       console.error('Error during callback:', error);
       res.status(500).json({ error: 'Authentication failed' });

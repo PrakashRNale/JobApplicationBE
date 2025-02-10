@@ -21,7 +21,6 @@ const Company = sequelize.define('Company', {
   },
   hremail: {
     type: DataTypes.STRING,
-    unique: true,
     allowNull: false,
   },
   subject : {
@@ -29,7 +28,7 @@ const Company = sequelize.define('Company', {
     allowNull: false,
   },
   maildroptime : {
-    type: DataTypes.DATE,
+    type: DataTypes.STRING,
     allowNull: false,
   },
   isapplied : {

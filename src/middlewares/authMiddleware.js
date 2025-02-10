@@ -18,6 +18,7 @@ const verifyTokenAndGetUser = async (token, req, res) => {
     
     // If token verification fails and it's a path with a special condition
     if (req.path === "/api/getApplied") {
+      console.log('****************** TOKEN VERIFICATION FAILED ****************')
       const responseData = dummyCompaniesForUnauthorizedUser();
       return res.status(200).json(responseData); // Returning dummy data if path matches
     }
@@ -34,7 +35,7 @@ exports.authenticateUser = async (req, res, next) => {
     // Handle missing token with path-specific logic
     if (!authHeader) {
       if (req.path === "/api/getApplied") {
-        console.log('Failed from line 40')
+        console.log('****************** No TOken ****************')
         const responseData = dummyCompaniesForUnauthorizedUser();
         return res.status(200).json(responseData);
       }

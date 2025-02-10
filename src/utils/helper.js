@@ -1,19 +1,5 @@
 const { DUMMYCOMPANIES } = require("../Constants/DummyCompanies");
 
-exports.getDelay = (futureTime) => {
-    try {
-        // Parse the target date-time as UTC
-        const targetDateTimeUTC = new Date(futureTime); // Ensure this is in ISO format
-        const currentDateTimeUTC = new Date(); // The server's current time in UTC
-
-        // Return the delay in milliseconds
-        return targetDateTimeUTC - currentDateTimeUTC;
-    } catch (error) {
-        console.error('Error calculating delay:', error.message); // Log the error message only
-        throw new Error('Unable to calculate delay.'); // Throw a generic error to avoid leaking sensitive info
-    }
-};
-
 exports.dummyCompaniesForUnauthorizedUser = () => {
     try {
         const dummyCompanies = DUMMYCOMPANIES.map((company, i) => {
